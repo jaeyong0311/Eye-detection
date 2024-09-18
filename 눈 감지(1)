@@ -1,0 +1,67 @@
+import cv2
+import time
+import pygame
+
+# Haar Cascade 분류 파일 경로
+eye_cascade_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
+
+# 분류 파일 로드
+eye_cascade = cv2.CascadeClassifier(eye_cascade_path)
+
+# 카메라 캡처 객체 생성
+cap = cv2.VideoCapture(0)  # 카메라 장치 번호 (일반적으로 0번)
+
+# Pygame 초기화
+pygame.init()
+pygame.mixer.init()
+
+# 경고음 파일 경로
+alert_sound = "alert.wav"  # 경고음 파일 (경로를 적절히 지정하세요)
+
+# 눈 감음을 감지하기 위한 변수
+eyes_closed = False
+start_time = None
+
+# 눈을 감았을 때 경고음을 내기 위한 함수
+def play_alert_sound():
+    pygame.mixer.music.load(alert_sound)
+    pygame.mixer.music.play()
+
+while True:
+    # 프레임 읽기
+    ret, frame = cap.read()
+
+    # 그레이스케일로 변환
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # 눈 검출
+    eyes = eye_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+    # 눈이 검출되지 않은 경우
+    if len(eyes) == 0:
+        if eyes_closed:
+            # 눈을 감은 상태에서 다시 눈을 뜬 경우
+            eyes_closed = False
+            start_time = None
+    else:
+        if not eyes_closed:
+            # 눈을 뜬 상태에서 눈을 감은 경우
+            eyes_closed = True
+            start_time = time.time()
+        else:
+            # 눈을 감은 상태에서 눈을 계속 감고 있는 경우
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= 5.0:  # 눈을 5초 이상 감은 경우
+                play_alert_sound()
+                start_time = None
+
+    # 화면에 결과 표시
+    cv2.imshow('Eye State Detection', frame)
+
+    # 'q' 키를 누르면 종료
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# 종료 시 카메라 해제 및 창 닫기
+cap.release()
+cv2.destroyAllWindows()
